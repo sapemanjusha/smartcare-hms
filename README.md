@@ -35,4 +35,4 @@ Password: (generate using generate_password.php)
 
 ---
 
-Made by ❤️ Team SmartCare
+Made by Team SmartCare (IInd Year CSE-IDP)
