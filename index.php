@@ -361,17 +361,19 @@
             <div class="col-md-4 form-group mt-3">
               <select name="department" id="department" class="form-select" required="">
                 <option value="">Select Department</option>
-                <option value="Department 1">Department 1</option>
-                <option value="Department 2">Department 2</option>
-                <option value="Department 3">Department 3</option>
+                <option value="Department 1">Cardiology</option>
+                <option value="Department 2">Dermatology</option>
+                <option value="Department 3">Orthopedics</option>
+		<option value="Department 4">Endocrinology</option>
               </select>
             </div>
             <div class="col-md-4 form-group mt-3">
               <select name="doctor" id="doctor" class="form-select" required="">
                 <option value="">Select Doctor</option>
-                <option value="Doctor 1">Doctor 1</option>
-                <option value="Doctor 2">Doctor 2</option>
-                <option value="Doctor 3">Doctor 3</option>
+                <option value="Doctor 1">Dr. Ravi Kumar</option>
+                <option value="Doctor 2">Dr. Anita Sharma</option>
+                <option value="Doctor 3">Dr. Rahul Verma</option>
+		<option value="Doctor 4">Dr. Jayanthi Ramesh</option>
               </select>
             </div>
           </div>

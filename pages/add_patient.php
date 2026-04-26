@@ -9,11 +9,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $fname = $_POST['first_name'];
     $lname = $_POST['last_name'];
     $gender = $_POST['gender'];
-    $dob = $_POST['dob'];
+    $dob = $_POST['date_of_birth'];
     $phone = $_POST['phone'];
     $address = $_POST['address'];
 
-    $sql = "INSERT INTO patients (first_name, last_name, gender, dob, phone, address)
+    $sql = "INSERT INTO patients (first_name, last_name, gender, date_of_birth, phone, address)
             VALUES ('$fname', '$lname', '$gender', '$dob', '$phone', '$address')";
 
     if ($conn->query($sql)) {
@@ -104,7 +104,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         </div>
 
         <div class="col-md-6">
-          <input type="date" name="dob" class="form-control" required>
+          <input type="date" name="date_of_birth" class="form-control" required>
         </div>
       </div>
 
