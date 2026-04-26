@@ -1,10 +1,15 @@
-<?php require_once("../auth_check.php"); ?>
+<?php require_once("../auth_check.php"); ?> 
 <?php allow_roles(['Admin','Receptionist']); ?>
 <?php include('../config/db.php'); ?>
 
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 $message = "";
 $billDetails = [];
+$room_total = 0;
+$medicine_total = 0;
 
 // Fetch patients
 $patients = $conn->query("SELECT patient_id, first_name, last_name FROM patients");
@@ -13,7 +18,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     $patient_id = $_POST['patient_id'];
 
-    // Get prescriptions for this patient
+    // ROOM CHARGES
+    $admission = $conn->query("
+        SELECT a.*, r.charge_per_day
+        FROM admissions a
+        JOIN rooms r ON a.room_id = r.room_id
+        WHERE a.patient_id = '$patient_id'
+        ORDER BY a.admission_id DESC LIMIT 1
+    ")->fetch_assoc();
+
+    if ($admission && $admission['discharge_date']) {
+        $admit = strtotime($admission['admit_date']);
+        $discharge = strtotime($admission['discharge_date']);
+        $days = ceil(($discharge - $admit) / (60*60*24));
+        if ($days <= 0) $days = 1;
+
+        $room_total = $days * $admission['charge_per_day'];
+    }
+
+    // MEDICINES
     $prescriptions = $conn->query("
         SELECT p.medicine_id, p.quantity, m.price, m.medicine_name
         FROM prescriptions p
@@ -21,15 +44,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         WHERE p.patient_id = '$patient_id'
     ");
 
-    $total = 0;
     $items = [];
 
     while ($row = $prescriptions->fetch_assoc()) {
         $amount = $row['quantity'] * $row['price'];
-        $total += $amount;
+        $medicine_total += $amount;
 
         $items[] = [
-            'medicine_id' => $row['medicine_id'],
             'medicine_name' => $row['medicine_name'],
             'quantity' => $row['quantity'],
             'price' => $row['price'],
@@ -39,124 +60,68 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     if (count($items) > 0) {
 
-        // Insert into bills
+        $grand_total = $room_total + $medicine_total;
+
         $conn->query("
             INSERT INTO bills (patient_id, total_amount, payment_status)
-            VALUES ('$patient_id', '$total', 'Pending')
+            VALUES ('$patient_id', '$grand_total', 'Pending')
         ");
-
-        $bill_id = $conn->insert_id;
-
-        // Insert bill items
-        foreach ($items as $item) {
-            $conn->query("
-                INSERT INTO bill_items (bill_id, medicine_id, quantity, price)
-                VALUES ('$bill_id', '{$item['medicine_id']}', '{$item['quantity']}', '{$item['price']}')
-            ");
-        }
 
         $message = "✅ Bill Generated Successfully!";
         $billDetails = $items;
 
     } else {
-        $message = "❌ No prescriptions found for this patient!";
+        $message = "❌ No prescriptions found!";
     }
 }
 ?>
 
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<title>Billing - SmartCare HMS</title>
-
+<title>Billing</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-
-<style>
-body { background: #f4f7fc; }
-
-.form-card, .table-card {
-    background: white;
-    padding: 30px;
-    border-radius: 15px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-}
-
-.btn-custom {
-    background: #2a7be4;
-    border: none;
-}
-
-.btn-custom:hover {
-    background: #1e5ec9;
-}
-</style>
 </head>
 
-<body>
+<body style="background:#f4f7fc;">
 
-<!-- NAVBAR -->
-<nav class="navbar navbar-light bg-white shadow-sm px-4">
-  <a class="navbar-brand fw-bold" href="/smartcare_hms/">SmartCare HMS</a>
-  <div class="ms-auto">
-    <a href="/smartcare_hms/" class="btn btn-outline-primary me-2">Home</a>
-    <a href="/smartcare_hms/pages/dashboard.php" class="btn btn-primary">Dashboard</a>
-  </div>
-</nav>
+<div class="container mt-5">
 
-<!-- TITLE -->
-<div class="container text-center mt-5">
-  <h2>Generate Bill</h2>
-  <p class="text-muted">Automatically generate billing based on prescriptions</p>
-</div>
+<h2 class="text-center">Generate Bill</h2>
 
-<!-- FORM -->
-<div class="container mt-4">
-
-<?php if ($message != ""): ?>
-  <div class="alert alert-info"><?= $message ?></div>
+<?php if ($message): ?>
+<div class="alert alert-info"><?= $message ?></div>
 <?php endif; ?>
 
-<div class="form-card">
+<form method="POST" class="card p-4 mt-4">
 
-<form method="POST">
-
-<div class="mb-3">
-<select name="patient_id" class="form-control" required>
-  <option value="">Select Patient</option>
-  <?php while($p = $patients->fetch_assoc()): ?>
-    <option value="<?= $p['patient_id'] ?>">
-      <?= $p['first_name'] . " " . $p['last_name'] ?>
-    </option>
-  <?php endwhile; ?>
+<select name="patient_id" class="form-control mb-3" required>
+<option value="">Select Patient</option>
+<?php while($p = $patients->fetch_assoc()): ?>
+<option value="<?= $p['patient_id'] ?>">
+<?= $p['first_name']." ".$p['last_name'] ?>
+</option>
+<?php endwhile; ?>
 </select>
-</div>
 
-<button type="submit" class="btn btn-custom w-100 text-white">Generate Bill</button>
+<button class="btn btn-primary">Generate Bill</button>
 
 </form>
 
-</div>
+<?php if ($billDetails): ?>
 
-<!-- BILL TABLE -->
-<?php if (!empty($billDetails)): ?>
+<div class="card p-4 mt-4">
 
-<div class="table-card mt-4">
-
-<h5 class="mb-3">Bill Breakdown</h5>
+<h4>Bill Details</h4>
 
 <table class="table table-bordered">
-<thead>
 <tr>
 <th>Medicine</th>
-<th>Quantity</th>
+<th>Qty</th>
 <th>Price</th>
 <th>Total</th>
 </tr>
-</thead>
 
-<tbody>
-<?php $grand = 0; ?>
 <?php foreach ($billDetails as $item): ?>
 <tr>
 <td><?= $item['medicine_name'] ?></td>
@@ -164,18 +129,13 @@ body { background: #f4f7fc; }
 <td>₹<?= $item['price'] ?></td>
 <td>₹<?= $item['amount'] ?></td>
 </tr>
-<?php $grand += $item['amount']; ?>
 <?php endforeach; ?>
-</tbody>
-
-<tfoot>
-<tr>
-<th colspan="3">Grand Total</th>
-<th>₹<?= $grand ?></th>
-</tr>
-</tfoot>
 
 </table>
+
+<p><strong>Room Charges:</strong> ₹<?= $room_total ?></p>
+<p><strong>Medicine Total:</strong> ₹<?= $medicine_total ?></p>
+<h4>Grand Total: ₹<?= $room_total + $medicine_total ?></h4>
 
 </div>
 

@@ -55,7 +55,7 @@ if (isset($_POST['generate'])) {
 
         // Save bill
         $conn->query("
-            INSERT INTO bill (patient_id, total_amount, payment_status)
+            INSERT INTO bills (patient_id, total_amount, payment_status)
             VALUES ('$patient_id', '$grand_total', 'Pending')
         ");
 

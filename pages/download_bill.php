@@ -1,4 +1,5 @@
 <?php require_once("../auth_check.php"); ?>
+
 <?php
 require '../dompdf/autoload.inc.php';
 use Dompdf\Dompdf;
@@ -7,7 +8,7 @@ include('../config/db.php');
 
 $bill_id = $_GET['id'];
 
-// Get bill + patient
+// Bill + Patient
 $bill = $conn->query("
     SELECT b.*, p.first_name, p.last_name
     FROM bills b
@@ -17,7 +18,7 @@ $bill = $conn->query("
 
 $patient_id = $bill['patient_id'];
 
-// Get admission + room
+// Admission + Room
 $admission = $conn->query("
     SELECT a.*, r.room_type, r.charge_per_day
     FROM admissions a
@@ -26,7 +27,7 @@ $admission = $conn->query("
     ORDER BY a.admission_id DESC LIMIT 1
 ")->fetch_assoc();
 
-// Calculate stay
+// Stay calculation
 $days = 1;
 $room_total = 0;
 
@@ -39,7 +40,7 @@ if ($admission && $admission['discharge_date']) {
     $room_total = $days * $admission['charge_per_day'];
 }
 
-// Get medicines
+// Medicines
 $meds = $conn->query("
     SELECT m.medicine_name, m.price, p.quantity
     FROM prescriptions p
@@ -63,14 +64,18 @@ while ($row = $meds->fetch_assoc()) {
     </tr>";
 }
 
+// ✅ FINAL CORRECT TOTAL (IMPORTANT FIX)
+$grand_total = $room_total + $medicine_total;
+
 $html = "
 <!DOCTYPE html>
 <html>
 <head>
 <style>
 body {
-    font-family: Arial;
-    padding: 20px;
+    font-family: Arial, sans-serif;
+    padding: 30px;
+    color: #333;
 }
 
 .header {
@@ -80,52 +85,66 @@ body {
 .header h1 {
     margin: 0;
     color: #2a7be4;
+    font-size: 28px;
 }
 
 .sub {
-    color: gray;
     font-size: 14px;
+    color: gray;
 }
 
 .line {
     border-top: 2px solid #2a7be4;
-    margin: 15px 0;
+    margin: 20px 0;
 }
 
 .section {
     margin-bottom: 20px;
 }
 
+.info-table {
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+.info-table td {
+    padding: 6px;
+}
+
 table {
     width: 100%;
     border-collapse: collapse;
+    margin-top: 10px;
 }
 
-table, th, td {
-    border: 1px solid #ddd;
-}
-
-th {
+table th {
     background: #2a7be4;
     color: white;
     padding: 10px;
 }
 
-td {
+table td {
     padding: 8px;
+    border: 1px solid #ddd;
 }
 
-.total-box {
+.summary {
+    margin-top: 25px;
     text-align: right;
-    margin-top: 20px;
 }
 
-.total-box h2 {
+.summary h4 {
+    margin: 5px 0;
+}
+
+.summary .grand {
+    font-size: 22px;
     color: #2a7be4;
+    font-weight: bold;
 }
 
 .footer {
-    margin-top: 30px;
+    margin-top: 40px;
     text-align: center;
     font-size: 13px;
     color: gray;
@@ -142,53 +161,62 @@ td {
 
 <div class='line'></div>
 
+<table class='info-table'>
+<tr>
+<td><strong>Invoice ID:</strong> {$bill['bill_id']}</td>
+<td><strong>Date:</strong> {$bill['generated_at']}</td>
+</tr>
+<tr>
+<td><strong>Patient:</strong> {$bill['first_name']} {$bill['last_name']}</td>
+<td><strong>Status:</strong> {$bill['payment_status']}</td>
+</tr>
+</table>
+
 <div class='section'>
-    <strong>Invoice ID:</strong> {$bill['bill_id']}<br>
-    <strong>Patient:</strong> {$bill['first_name']} {$bill['last_name']}<br>
-    <strong>Date:</strong> {$bill['generated_at']}<br>
-    <strong>Status:</strong> {$bill['payment_status']}
+<h3>Room Charges</h3>
+
+<table>
+<tr>
+<th>Room Type</th>
+<th>Days</th>
+<th>Charge/Day</th>
+<th>Total</th>
+</tr>
+
+<tr>
+<td>{$admission['room_type']}</td>
+<td>{$days}</td>
+<td>₹{$admission['charge_per_day']}</td>
+<td>₹{$room_total}</td>
+</tr>
+</table>
 </div>
 
 <div class='section'>
-    <h3>Room Charges</h3>
-    <table>
-        <tr>
-            <th>Room Type</th>
-            <th>Days</th>
-            <th>Charge/Day</th>
-            <th>Total</th>
-        </tr>
-        <tr>
-            <td>{$admission['room_type']}</td>
-            <td>{$days}</td>
-            <td>₹{$admission['charge_per_day']}</td>
-            <td>₹{$room_total}</td>
-        </tr>
-    </table>
+<h3>Medicine Charges</h3>
+
+<table>
+<tr>
+<th>Medicine</th>
+<th>Qty</th>
+<th>Price</th>
+<th>Total</th>
+</tr>
+
+$medicine_rows
+
+</table>
 </div>
 
-<div class='section'>
-    <h3>Medicine Charges</h3>
-    <table>
-        <tr>
-            <th>Medicine</th>
-            <th>Qty</th>
-            <th>Price</th>
-            <th>Total</th>
-        </tr>
-        $medicine_rows
-    </table>
-</div>
-
-<div class='total-box'>
-    <h4>Room Total: ₹{$room_total}</h4>
-    <h4>Medicine Total: ₹{$medicine_total}</h4>
-    <h2>Grand Total: ₹{$bill['total_amount']}</h2>
+<div class='summary'>
+<h4>Room Total: ₹{$room_total}</h4>
+<h4>Medicine Total: ₹{$medicine_total}</h4>
+<h4 class='grand'>Grand Total: ₹{$grand_total}</h4>
 </div>
 
 <div class='footer'>
-    Thank you for choosing SmartCare HMS<br>
-    Wishing you good health!
+Thank you for choosing SmartCare HMS<br>
+Wishing you a speedy recovery 💙
 </div>
 
 </body>
@@ -199,4 +227,4 @@ $dompdf = new Dompdf();
 $dompdf->loadHtml($html);
 $dompdf->setPaper('A4', 'portrait');
 $dompdf->render();
-$dompdf->stream("SmartCare_Final_Bill.pdf", ["Attachment" => true]);
+$dompdf->stream("SmartCare_Invoice.pdf", ["Attachment" => true]);
